@@ -1,2 +1,0 @@
-[local]
-localhost ansible_connection=local ansible_become=true ansible_become_user=yumomba ansible_become_password=aj7878palm

@@ -1,8 +1,0 @@
----
-- name: Verify services started
-  ansible.builtin.include_tasks: verify_services_started.yml
-  listen: "verify services started"
-
-- name: Verify services stopped
-  ansible.builtin.include_tasks: verify_services_stopped.yml
-  listen: "verify services stopped"

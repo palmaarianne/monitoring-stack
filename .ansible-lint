@@ -5,7 +5,6 @@ use_default_rules: true
 exclude_paths:
   - .gitlab-ci.yml
   - ansible-inventories
-  - ansible-roles
 
 mock_roles:
   - monitoring_stack_services

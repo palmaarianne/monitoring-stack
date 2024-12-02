@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scrape Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Scrape Grafana metrics
+  - job_name: 'grafana'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['grafana:3000'] # Internal address of the Grafana container
+    basic_auth:
+      username: 'metrics_user'    # Match credentials in the Grafana service
+      password: 'metrics_pass'
+
+  # Example: Add more scrape targets here as needed
+  # Scrape a Node Exporter or other application metrics
+  # - job_name: 'node_exporter'
+  #   static_configs:
+  #     - targets: ['node_exporter:9100']
