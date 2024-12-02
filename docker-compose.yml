@@ -20,6 +20,9 @@ services:
     container_name: influxdb
     ports:
       - "8086:8086"
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb
+      - ./influxdb/config:/etc/influxdb      
 
   prometheus:
     image: prom/prometheus:latest
