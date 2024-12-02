@@ -2,6 +2,7 @@
 - name: Deploy Monitoring Stack
   hosts: all
   become: true
+
   tasks:
     - name: Install Docker
       ansible.builtin.shell: |
@@ -14,14 +15,31 @@
           -o /usr/local/bin/docker-compose
         chmod +x /usr/local/bin/docker-compose
 
-    - name: Copy files to VM
+    - name: Create directory for stack
+      ansible.builtin.file:
+        path: /opt/monitoring-stack
+        state: directory
+
+    - name: Copy Docker Compose file
       ansible.builtin.copy:
-        src: "{{ item }}"
-        dest: "/opt/monitoring-stack/"
+        src: docker-compose.yml
+        dest: /opt/monitoring-stack/docker-compose.yml
+
+    - name: Copy Prometheus config
+      ansible.builtin.copy:
+        src: prometheus.yml
+        dest: /opt/monitoring-stack/prometheus.yml
+
+    - name: Copy Telegraf config
+      ansible.builtin.copy:
+        src: telegraf.conf
+        dest: /opt/monitoring-stack/telegraf.conf
+
+    - name: Copy Grafana resources
+      ansible.builtin.copy:
+        src: grafana-resources/
+        dest: /opt/monitoring-stack/grafana-resources/
         remote_src: no
-      loop:
-        - docker-compose.yml
-        - grafana-resources/
 
     - name: Start Monitoring Stack
       ansible.builtin.shell: |
