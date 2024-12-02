@@ -1,0 +1,51 @@
+---
+ms_services:
+  - prometheus
+  - node_exporter
+  - squid_exporter
+  - telegraf  
+
+ms_telegraf_docker_privileged: true
+
+ms_telegraf_output_influxdb:
+  - urls: [ "http://localhost:8086" ]
+    database: "telegraf"
+
+# ms_telegraf_output_kafka:
+#   - brokers:
+#       - "localhost:9092"
+#     topic: "telegraf"
+#     routing_tag: "host"
+#     required_acks: -1
+#     max_retry: 3
+
+ms_telegraf_input_socketstat:
+  enabled: true
+  protocols: ["unix"]
+  # tags:
+  #   environment: "local"
+
+ms_prometheus_docker_dns:
+  - 10.99.0.10
+  - 10.99.0.11
+
+ms_prometheus_global_labels:
+  deployment_stack: "localhost"
+  deployment_group: "local"
+
+ms_prometheus_remote_write_url: "http://{{ ansible_default_ipv4.address }}:19291/api/v1/receive"
+ms_prometheus_remote_write_thanos_tenant: "atlas-oci-prod"
+ms_prometheus_remote_write_tls_enable: false
+
+ms_prometheus_scrape_configs_jobs:
+  - name: "node_exporter"
+    targets: ["{{ ansible_default_ipv4.address }}:9100"]
+  - name: "squid_exporter"
+    targets: ["{{ ansible_default_ipv4.address }}:9301"]
+    labels:
+      tier: "general"
+      xpto: "kkk"
+
+ms_nodeexporter_docker_network_mode: "host"
+ms_squidexporter_docker_network_mode: "host"
+ms_squidexporter_docker_env_var_squid_port: 7557

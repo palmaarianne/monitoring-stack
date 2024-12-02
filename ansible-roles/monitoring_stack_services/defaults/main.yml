@@ -1,0 +1,124 @@
+---
+##############################################################################
+#                         General Variables                                  #
+##############################################################################
+
+ms_nexus_url: ""
+ms_config_dir: /opt/monitoring
+ms_config_cert_dir: "{{ ms_config_dir }}/cert"
+ms_compose_config_path: "{{ ms_config_dir }}/docker-compose.yml"
+ms_docker_install_packages: false
+ms_docker_network_ipam_subnet: ""
+ms_docker_network_ipam_gateway: ""
+ms_services: [prometheus, node_exporter]
+
+##############################################################################
+#                       Prometheus Variables                                 #
+##############################################################################
+ms_prometheus_docker_image: "prom/prometheus:latest"
+ms_prometheus_docker_container_name: "prometheus"
+ms_prometheus_docker_ports: ['9090:9090']
+ms_prometheus_docker_network_mode: "bridge"
+ms_prometheus_docker_dns: []
+ms_prometheus_global_labels: {}
+ms_prometheus_config_path: "{{ ms_config_dir }}/prometheus.yml"
+ms_prometheus_scrape_interval: "15s"
+ms_prometheus_scrape_configs_jobs: []
+ms_prometheus_remote_write_url: ""
+ms_prometheus_remote_write_thanos_tenant: ""
+ms_prometheus_remote_write_tls_enable: false
+ms_prometheus_remote_write_tls_ca_cert: ""
+ms_prometheus_remote_write_tls_public_cert: ""
+ms_prometheus_remote_write_tls_private_cert: ""
+
+##############################################################################
+#                      Node Exporter Variables                               #
+##############################################################################
+
+ms_nodeexporter_docker_image: "prom/node-exporter:latest"
+ms_nodeexporter_docker_container_name: "node_exporter"
+ms_nodeexporter_docker_ports: ['9100:9100']
+ms_nodeexporter_docker_network_mode: "bridge"
+
+##############################################################################
+#                      Nginx Exporter Variables                              #
+##############################################################################
+
+ms_nginxexporter_docker_image: "nginx/nginx-prometheus-exporter:latest"
+ms_nginxexporter_docker_container_name: "nginx_exporter"
+ms_nginxexporter_docker_ports: ['9113:9113']
+ms_nginxexporter_docker_network_mode: "bridge"
+ms_nginxexporter_commands: ["-nginx.scrape-uri=http://nginx:8080/stub_status"]
+
+##############################################################################
+#                    cAdvisor Exporter Variables                             #
+##############################################################################
+
+ms_cadvisor_docker_image: "gcr.io/cadvisor/cadvisor:latest"
+ms_cadvisor_docker_container_name: "cadvisor-exporter"
+ms_cadvisor_docker_ports: ['8080:8080']
+ms_cadvisor_docker_network_mode: "bridge"
+
+##############################################################################
+#                      Squid Exporter Variables                              #
+##############################################################################
+
+ms_squidexporter_docker_image: "boynux/squid-exporter:latest"
+ms_squidexporter_docker_container_name: "squid-exporter"
+ms_squidexporter_docker_ports: ['9301:9301']
+ms_squidexporter_docker_network_mode: "bridge"
+ms_squidexporter_docker_network_ipv4_address: ""
+ms_squidexporter_docker_env_var_squid_hostname: "127.0.0.1"
+ms_squidexporter_docker_env_var_squid_port: "3128"
+ms_squidexporter_docker_env_var_squid_exporter_listen: ":9301"
+
+##############################################################################
+#                          Telegraf Variables                                #
+##############################################################################
+
+ms_telegraf_docker_image: "telegraf:1.30"
+ms_telegraf_docker_container_name: "telegraf"
+ms_telegraf_docker_privileged: false
+ms_telegraf_docker_user: "telegraf"
+ms_telegraf_docker_linux_groups: [docker]
+ms_telegraf_docker_network_mode: "host"
+ms_telegraf_docker_ports: ['8092:8092/udp', '8094:8094/tcp', '8125:8125/udp']
+ms_telegraf_docker_socket_path: /var/run/docker.sock
+ms_telegraf_config_path: "{{ ms_config_dir }}/telegraf.conf"
+ms_telegraf_global_tags: {}
+ms_telegraf_agent_interval: 10s
+ms_telegraf_agent_flush_interval: 10s
+ms_telegraf_agent_hostname: "{{ ansible_hostname }}"
+ms_telegraf_input_cpu: { enabled: true }
+ms_telegraf_input_mem: { enabled: true }
+ms_telegraf_input_kernel: { enabled: true }
+ms_telegraf_input_system: { enabled: true }
+ms_telegraf_input_processes: { enabled: true }
+ms_telegraf_input_swap: { enabled: true }
+ms_telegraf_input_net: { enabled: true }
+ms_telegraf_input_netstat: { enabled: true }
+ms_telegraf_input_disk: { enabled: true }
+ms_telegraf_input_diskio: { enabled: true }
+ms_telegraf_input_conntrack: { enabled: true }
+ms_telegraf_input_ntpq: { enabled: false }
+ms_telegraf_input_http_response: { enabled: false }
+ms_telegraf_input_procstat: { enabled: true, monitored_system_processes: [{ name: "telegraf"}] }
+ms_telegraf_input_ping: { enabled: false }
+ms_telegraf_input_filestat: { enabled: false }
+ms_telegraf_input_x509_cert: { enabled: false }
+ms_telegraf_input_docker: { enabled: true }
+ms_telegraf_input_linux_sysctl_fs: { enabled: true }
+ms_telegraf_input_haproxy: { enabled: false }
+ms_telegraf_input_redis: { enabled: false }
+ms_telegraf_input_rabbitmq: { enabled: false }
+ms_telegraf_input_prometheus: { enabled: false }
+ms_telegraf_input_jolokia2_agent: { enabled: false }
+ms_telegraf_input_varnish: { enabled: false }
+ms_telegraf_input_varnish_folder_path: /var/lib/varnish
+ms_telegraf_input_varnish_libraries:
+  - /usr/lib64/libvarnishapi.so.2:/usr/lib/x86_64-linux-gnu/libvarnishapi.so.2
+  - /usr/lib64/libncursesw.so.5:/usr/lib/x86_64-linux-gnu/libncursesw.so.5
+  - /usr/lib64/libtinfo.so.5:/usr/lib/x86_64-linux-gnu/libtinfo.so.5
+  - /usr/lib64/libpcre.so.1:/lib/x86_64-linux-gnu/libpcre.so.1
+ms_telegraf_output_influxdb: []
+ms_telegraf_output_kafka: []

@@ -1,0 +1,170 @@
+#jinja2: lstrip_blocks: "True"
+
+networks:
+  monitoring:
+    driver: bridge
+    {% if ms_docker_network_ipam_subnet or ms_docker_network_ipam_gateway %}
+    ipam:
+      config:
+      -
+        {% if  ms_docker_network_ipam_subnet %}
+        subnet: {{ ms_docker_network_ipam_subnet }}
+        {% endif %}
+        {% if  ms_docker_network_ipam_gateway %}
+        gateway: {{ ms_docker_network_ipam_gateway }}
+        {% endif %}
+    {% endif %}
+
+volumes:
+  prometheus_data: {}
+
+
+services:
+{% if 'prometheus' in ms_services %}
+  prometheus:
+    image: {{ ms_prometheus_docker_image }}
+    container_name: {{ ms_prometheus_docker_container_name }}
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--enable-feature=agent'
+    volumes:
+      - {{ms_prometheus_config_path }}:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+      - {{ ms_config_cert_dir }}:/etc/prometheus/cert
+    {% if ms_prometheus_docker_network_mode == 'bridge' %}
+    ports: {{ ms_prometheus_docker_ports }}
+    networks:
+      - monitoring
+    {% else %}
+    network_mode: {{ ms_prometheus_docker_network_mode }}
+    {% endif %}
+    {% if ms_prometheus_docker_dns %}
+    dns: {{ ms_prometheus_docker_dns  }}
+    {% endif %}
+{% endif %}
+
+{% if 'node_exporter' in ms_services %}
+  node_exporter:
+    image: {{ ms_nodeexporter_docker_image }}
+    container_name: {{ ms_nodeexporter_docker_container_name }}
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    {% if ms_nodeexporter_docker_network_mode == 'bridge' %}
+    ports: {{ ms_nodeexporter_docker_ports }}
+    networks:
+      - monitoring
+    {% else %}
+    network_mode: {{ ms_nodeexporter_docker_network_mode }}
+    {% endif %}
+{% endif %}
+
+{% if 'nginx_exporter' in ms_services %}
+  nginx_exporter:
+    image: {{ ms_nginxexporter_docker_image }}
+    container_name: {{ ms_nginxexporter_docker_container_name }}
+    restart: unless-stopped
+    command: {{ ms_nginxexporter_commands }}
+    {% if ms_nginxexporter_docker_network_mode == 'bridge' %}
+    ports: {{ ms_nginxexporter_docker_ports }}
+    networks:
+      - monitoring
+    {% else %}
+    network_mode: {{ ms_nginxexporter_docker_network_mode }}
+    {% endif %}
+{% endif %}
+
+{% if 'cadvisor' in ms_services %}
+  cadvisor:
+    image: {{ ms_cadvisor_docker_image }}
+    container_name: {{ ms_cadvisor_docker_container_name }}
+    restart: unless-stopped
+    {% if ms_cadvisor_docker_network_mode == 'bridge' %}
+    ports: {{ ms_cadvisor_docker_ports }}
+    networks:
+      - monitoring
+    {% else %}
+    network_mode: {{ ms_cadvisor_docker_network_mode }}
+    {% endif %}
+{% endif %}
+
+{% if 'squid_exporter' in ms_services %}
+  squid-exporter:
+    image: {{ ms_squidexporter_docker_image }}
+    container_name: {{ ms_squidexporter_docker_container_name }}
+    restart: unless-stopped
+    {% if ms_squidexporter_docker_network_mode == 'bridge' %}
+    ports: {{ ms_squidexporter_docker_ports }}
+      {% if ms_squidexporter_docker_network_ipv4_address  %}
+    networks:
+      monitoring:
+        ipv4_address: {{ ms_squidexporter_docker_network_ipv4_address }}
+      {% else %}
+    networks:
+      - monitoring
+      {% endif %}
+    {% else %}
+    network_mode: {{ ms_squidexporter_docker_network_mode }}
+    {% endif %}
+    environment:
+      TZ: UTC
+      SQUID_HOSTNAME: "{{ ms_squidexporter_docker_env_var_squid_hostname }}"
+      SQUID_PORT: "{{ ms_squidexporter_docker_env_var_squid_port }}"
+      SQUID_EXPORTER_LISTEN: "{{ ms_squidexporter_docker_env_var_squid_exporter_listen }}"
+{% endif %}
+
+{% if 'telegraf' in ms_services %}
+  telegraf:
+    image: {{ ms_telegraf_docker_image }}
+    container_name: {{ ms_telegraf_docker_container_name }}
+    restart: unless-stopped
+    {% if ms_telegraf_docker_privileged %}
+    user: root
+    privileged: true
+    {% else %}
+    user: {{ ms_telegraf_docker_user }}
+    {% endif %}
+    {% if telegraf_docker_linux_groups | length > 0 %}
+    group_add:
+      {% for group in telegraf_docker_linux_groups %}
+      - {{ group.gid }} # {{ group.name }}
+      {% endfor %}
+    {% endif %}
+    {% if ms_telegraf_docker_network_mode == 'bridge' %}
+    ports: {{ ms_telegraf_docker_ports }}
+    networks:
+      - monitoring
+    {% else %}
+    network_mode: {{ ms_telegraf_docker_network_mode }}
+    {% endif %}
+    volumes:
+      - /:/hostfs:ro
+      - {{ ms_telegraf_config_path }}:/etc/telegraf/telegraf.conf:ro
+      - {{ ms_telegraf_docker_socket_path }}:/var/run/docker.sock
+      {% if ms_telegraf_input_varnish and ms_telegraf_input_varnish.enabled | default(true) %}
+      # Varnish Libraries
+      {%  for library in ms_telegraf_input_varnish_libraries %}
+      - {{ library }}
+      {%  endfor %}
+      # Varnish Cache Folder
+      - {{ ms_telegraf_input_varnish_folder_path }}:/var/lib/varnish:ro
+      {% endif %}
+    environment:
+      HOST_ETC: "/hostfs/etc"
+      HOST_PROC: "/hostfs/proc"
+      HOST_SYS: "/hostfs/sys"
+      HOST_VAR: "/hostfs/var"
+      HOST_RUN: "/hostfs/run"
+      HOST_MOUNT_PREFIX: "/hostfs"
+    entrypoint: ["/usr/bin/telegraf", "--config", "/etc/telegraf/telegraf.conf"]
+{% endif %}

@@ -1,0 +1,52 @@
+---
+- name: Get Docker installation repository
+  ansible.builtin.shell: yum list installed docker-ce | awk '/docker-ce/{print $3}'
+  register: docker_repo
+  ignore_errors: true
+  changed_when: false
+  # noqa command-instead-of-module
+
+- name: Add custom Docker CE repository from Nexus
+  ansible.builtin.yum_repository:
+    name: centos-docker-ce-stable
+    description: CentOS 7 Docker repo
+    baseurl: "https://{{ ms_nexus_url }}/repository/centos-docker-ce-stable"
+    gpgcheck: true
+    enabled: true
+    file: centos-docker-ce-stable
+  when: ms_nexus_url
+
+- name: Install Docker packages
+  ansible.builtin.yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Start and enable Docker service
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Check Docker is running
+  ansible.builtin.command: docker ps
+  changed_when: false
+  register: docker_check
+  failed_when: docker_check.rc != 0
+
+- name: Copy docker-compose to /usr/bin
+  ansible.builtin.copy:
+    src: /usr/libexec/docker/cli-plugins/docker-compose
+    dest: /usr/bin/docker-compose
+    mode: "0755"
+    remote_src: true
+
+- name: Check docker-compose is available
+  ansible.builtin.command: docker-compose --version
+  changed_when: false
+  register: compose_check
+  failed_when: compose_check.rc != 0

@@ -1,0 +1,9 @@
+---
+- name: Stop monitoring stack services
+  community.docker.docker_compose_v2:
+    project_src: "{{ ms_config_dir }}"
+    state: stopped
+  notify: "verify services stopped"
+
+- name: Force handler execution
+  ansible.builtin.meta: flush_handlers

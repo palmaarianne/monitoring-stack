@@ -1,0 +1,123 @@
+---
+- name: Assert telegraf rabbitmq input configuration
+  ansible.builtin.assert:
+    that:
+      - " item.content | length > 0 "
+    fail_msg: "The property {{ item.name }} wasn't provided"
+    success_msg: "The property {{ item.name }} was provided"
+  loop:
+    - name: 'monitoring_stack_telegraf.configuration.inputs.rabbitmq.url'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.rabbitmq.url | default('') }}"
+    - name: 'monitoring_stack_telegraf.configuration.inputs.rabbitmq.username'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.rabbitmq.username | default('') }}"
+    - name: 'monitoring_stack_telegraf.configuration.inputs.rabbitmq.password'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.rabbitmq.password | default('') }}"
+  when:
+    - monitoring_stack_telegraf.configuration.inputs.rabbitmq | default(false)
+    - monitoring_stack_telegraf.configuration.inputs.rabbitmq.enabled | default(true)
+
+- name: Assert certificates are provided when TLS is enabled
+  ansible.builtin.assert:
+    that:
+      - " item.content | length > 0 "
+    fail_msg: "TLS is enabled but {{ item.name }} certificate wasn't provided"
+    success_msg: "TLS Certificates provided"
+  loop:
+    - { name: 'ms_prometheus_remote_write_tls_public_cert', content: "{{ ms_prometheus_remote_write_tls_public_cert }}" }
+    - { name: 'ms_prometheus_remote_write_tls_private_cert', content: "{{ ms_prometheus_remote_write_tls_private_cert }}" }
+    - { name: 'ms_prometheus_remote_write_tls_ca_cert', content: "{{ ms_prometheus_remote_write_tls_ca_cert }}" }
+  when:
+    - ms_prometheus_remote_write_tls_enable
+
+- name: Assert Prometheus remote write configuration is provided
+  ansible.builtin.assert:
+    that:
+      - " item.content | length > 0 "
+    fail_msg: "The property {{ item.name }} wasn't provided"
+    success_msg: "The property {{ item.name }} was provided"
+  loop:
+    - { name: 'ms_prometheus_remote_write_url', content: "{{ ms_prometheus_remote_write_url }}" }
+    - { name: 'ms_prometheus_remote_write_thanos_tenant', content: "{{ ms_prometheus_remote_write_thanos_tenant }}" }
+  when:
+    - "'prometheus' in ms_services"
+
+- name: Assert telegraf jolokia2 input configuration
+  ansible.builtin.assert:
+    that:
+      - " item.content | length > 0 "
+    fail_msg: "The property {{ item.name }} wasn't provided"
+    success_msg: "The property {{ item.name }} was provided"
+  loop:
+    - name: 'monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.urls'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.urls | default([]) }}"
+    - name: 'monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.metrics'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.metrics | default([]) }}"
+  when:
+    - monitoring_stack_telegraf.configuration.inputs.jolokia2_agent | default(false)
+    - monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.enabled | default(true)
+
+- name: Assert telegraf jolokia2 input metrics configuration
+  ansible.builtin.assert:
+    that:
+      - "{{ item.name | default('') | length > 0 }}"
+      - "{{ item.mbean | default('') | length > 0 }}"
+    fail_msg: >
+      Either the property jolokia2_agent.metrics.*.name ( {{ item.name | default('undefined') }} ) or
+      jolokia2_agent.metrics.*.mbean ( {{ item.mbean | default('undefined') }} ) weren't provided
+    success_msg: >
+      The property jolokia2_agent.metrics.*.name ( {{ item.name | default('undefined') }} ) and
+      jolokia2_agent.metrics.*.mbean ( {{ item.mbean | default('undefined') }} ) were provided
+  loop: "{{ monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.metrics }}"
+  when:
+    - monitoring_stack_telegraf.configuration.inputs.jolokia2_agent | default(false)
+    - monitoring_stack_telegraf.configuration.inputs.jolokia2_agent.enabled | default(true)
+
+- name: Assert telegraf varnish input configuration
+  ansible.builtin.assert:
+    that:
+      - " item.content | length > 0 "
+    fail_msg: "The property {{ item.name }} wasn't provided"
+    success_msg: "The property {{ item.name }} was provided"
+  loop:
+    - name: 'monitoring_stack_telegraf.configuration.inputs.varnish.binary'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.varnish.binary | default('') }}"
+    - name: 'monitoring_stack_telegraf.configuration.inputs.varnish.adm_binary'
+      content: "{{ monitoring_stack_telegraf.configuration.inputs.varnish.adm_binary | default('') }}"
+  when:
+    - monitoring_stack_telegraf.configuration.inputs.varnish | default(false)
+    - monitoring_stack_telegraf.configuration.inputs.varnish.enabled | default(true)
+
+- name: Assert telegraf prometheus input configuration
+  ansible.builtin.assert:
+    that:
+      - " item.content | length > 0 "
+    fail_msg: "The property {{ item.name }} wasn't provided"
+    success_msg: "The property {{ item.name }} was provided"
+  loop:
+    - name: 'ms_telegraf_input_prometheus.urls'
+      content: "{{ ms_telegraf_input_prometheus.urls | default([]) }}"
+  when:
+    - ms_telegraf_input_prometheus | default(false)
+    - ms_telegraf_input_prometheus.enabled | default(true)
+
+- name: Assert telegraf influxdb output configuration
+  ansible.builtin.assert:
+    that:
+      - " item.urls | default('') | length > 0 "
+    fail_msg: "The property ms_telegraf_output_influxdb.*.urls ({{ item.urls | default('undefined') }}) wasn't provided"
+    success_msg: "The property ms_telegraf_output_influxdb.*.urls ({{ item.urls | default('undefined') }}) wasn't provided"
+  loop: "{{ ms_telegraf_output_influxdb }}"
+  when:
+    - ms_telegraf_output_influxdb | default(false)
+    - ms_telegraf_output_influxdb.enabled | default(true)
+
+- name: Assert telegraf kafka output configuration
+  ansible.builtin.assert:
+    that:
+      - " item.brokers | default('') | length > 0 "
+    fail_msg: "The property ms_telegraf_output_kafka.*.brokers ({{ item.brokers | default('undefined') }}) wasn't provided"
+    success_msg: "The property ms_telegraf_output_kafka.*.brokers ({{ item.brokers | default('undefined') }}) wasn't provided"
+  loop: "{{ ms_telegraf_output_kafka }}"
+  when:
+    - ms_telegraf_output_kafka | default(false)
+    - ms_telegraf_output_kafka.enabled | default(true)

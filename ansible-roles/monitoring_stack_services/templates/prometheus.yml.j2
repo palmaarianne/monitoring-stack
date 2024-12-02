@@ -1,0 +1,64 @@
+#jinja2: lstrip_blocks: "True"
+global:
+  scrape_interval: {{ ms_prometheus_scrape_interval }}
+  external_labels:
+    host: "{{ ansible_hostname }}"
+    {% for key, value in ms_prometheus_global_labels.items() %}
+    {{ key }}: "{{ value }}"
+    {% endfor %}
+
+scrape_configs:
+- job_name: 'prometheus'
+  static_configs:
+  - targets: ['prometheus:9090']
+  relabel_configs:
+  - source_labels: ["__address__"]
+    target_label: "instance"
+    regex: "(.*):(.*)"
+    replacement: "${1}"
+
+
+{% for job in ms_prometheus_scrape_configs_jobs %}
+- job_name: {{ job.name }}
+  static_configs:
+  - targets: {{ job.targets | to_json }}
+    {% if job.labels is defined %}
+    labels:
+    {% for key, value in job.labels.items() %}
+      {{ key }}: "{{ value }}"
+    {% endfor %}
+    {% endif %}
+  relabel_configs:
+  - source_labels: ["__address__"]
+    target_label: "instance"
+    regex: "(.*):(.*)"
+    replacement: "${1}"
+  {% if job.relabel_configs is defined %}
+  {% for relabel in job.relabel_configs %}
+  - source_labels: {{ relabel.source_labels | to_json }}
+    target_label: "{{ relabel.target_label }}"
+    {% if relabel.regex is defined %}
+    regex: "{{ relabel.regex }}"
+    {% endif %}
+    {% if relabel.replacement is defined %}
+    replacement: "{{ relabel.replacement }}"
+    {% endif %}
+  {% endfor %}
+  {% endif %}
+{% endfor %}
+
+
+remote_write:
+  - url: {{ ms_prometheus_remote_write_url }}
+    headers:
+      THANOS-TENANT: {{ ms_prometheus_remote_write_thanos_tenant }}
+    {% if ms_prometheus_remote_write_tls_enable %}
+    tls_config:
+      cert_file: "/etc/prometheus/cert/remote-write-tls.crt"
+      key_file: "/etc/prometheus/cert/remote-write-tls.key"
+      ca_file: "/etc/prometheus/cert/remote-write-ca.crt"
+    {% endif %}
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500

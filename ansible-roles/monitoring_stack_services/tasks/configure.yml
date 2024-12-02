@@ -1,0 +1,141 @@
+---
+- name: Create Prometheus configuration directory
+  ansible.builtin.file:
+    path: "{{ ms_config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create certs directory
+  ansible.builtin.file:
+    path: "{{ ms_config_cert_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Template Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ ms_prometheus_config_path }}"
+    mode: "0644"
+    validate: >
+      docker run --rm --entrypoint=promtool
+      -v %s:/etc/prometheus/prometheus.yml
+      prom/prometheus check config /etc/prometheus/prometheus.yml
+  register: prometheus_config
+  when:
+    - "'prometheus' in ms_services"
+
+- name: Initialize list for docker telegraf group GIDs
+  ansible.builtin.set_fact:
+    telegraf_docker_linux_groups: []
+
+- name: Get GID for each docker telegraf group GIDs
+  ansible.builtin.getent:
+    database: group
+    key: "{{ item }}"
+  register: telegraf_group_info
+  loop: "{{ ms_telegraf_docker_linux_groups }}"
+  when:
+    - "'telegraf' in ms_services"
+
+- name: Append group name and GID to list
+  ansible.builtin.set_fact:
+    telegraf_docker_linux_groups: >-
+      {{
+        telegraf_docker_linux_groups + [{
+          'name': item,
+          'gid': telegraf_group_info.results[index].ansible_facts.getent_group[item][1]
+        }]
+      }}
+  loop: "{{ ms_telegraf_docker_linux_groups }}"
+  loop_control:
+    index_var: "index"
+  when:
+    - "'telegraf' in ms_services"
+    - telegraf_group_info.results[index] is defined
+
+- name: Template Telegraf configuration
+  ansible.builtin.template:
+    src: telegraf.conf.j2
+    dest: "{{ ms_telegraf_config_path }}"
+    mode: "0644"
+    validate: >
+      docker run --rm
+      --net={{ ms_telegraf_docker_network_mode }}
+      {% if ms_telegraf_docker_privileged %}
+      --privileged
+      --user root
+      {% else %}
+      --user {{ ms_telegraf_docker_user }}
+      {% endif %}
+      {% for group in telegraf_docker_linux_groups %}
+      --group-add {{ group.gid }}
+      {% endfor %}
+      -v /:/hostfs:ro
+      -v %s:/etc/telegraf/telegraf.conf
+      -v {{ ms_telegraf_docker_socket_path }}:/var/run/docker.sock
+      {% if ms_telegraf_input_varnish and ms_telegraf_input_varnish.enabled | default(true) %}
+      {%  for library in ms_telegraf_input_varnish_libraries | default([]) %}
+      -v {{ library }}
+      {%  endfor %}
+      -v {{ ms_telegraf_input_varnish_folder_path }}:/var/lib/varnish:ro
+      {% endif %}
+      -e HOST_ETC="/hostfs/etc"
+      -e HOST_PROC="/hostfs/proc"
+      -e HOST_SYS="/hostfs/sys"
+      -e HOST_VAR="/hostfs/var"
+      -e HOST_RUN="/hostfs/run"
+      -e HOST_MOUNT_PREFIX="/hostfs"
+      --entrypoint /usr/bin/telegraf
+      {{ ms_telegraf_docker_image }}
+      --config /etc/telegraf/telegraf.conf --quiet --once
+  register: telegraf_config
+  when:
+    - "'telegraf' in ms_services"
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ ms_compose_config_path }}"
+    mode: "0644"
+    validate: docker compose -f %s config
+  register: docker_compose_file
+
+- name: Write certificate files
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ ms_config_cert_dir }}/{{ item.filename }}"
+    mode: "0644"
+  loop:
+    - { content: "{{ ms_prometheus_remote_write_tls_public_cert }}", filename: "remote-write-tls.crt" }
+    - { content: "{{ ms_prometheus_remote_write_tls_private_cert }}", filename: "remote-write-tls.key" }
+    - { content: "{{ ms_prometheus_remote_write_tls_ca_cert }}", filename: "remote-write-ca.crt" }
+  when:
+    - ms_prometheus_remote_write_tls_enable
+  register: cert_files_updated
+
+- name: Ensure monitoring stack is up-to-date
+  community.docker.docker_compose_v2:
+    project_src: "{{ ms_config_dir }}"
+    state: present
+    remove_orphans: true
+  register: docker_compose_up_result
+  notify: "Verify services started"
+
+- name: Check if Prometheus was restarted due to docker-compose changes
+  ansible.builtin.set_fact:
+    prometheus_restarted: "{{ 'prometheus' in (docker_compose_up_result.services_changed | default([])) }}"
+  when: "'prometheus' in ms_services"
+
+- name: Restart Prometheus if its configuration changed and wasn't already restarted
+  community.docker.docker_compose_v2:
+    project_src: "{{ ms_config_dir }}"
+    services:
+      - prometheus
+    state: restarted
+  when:
+    - "'prometheus' in ms_services"
+    - >
+      prometheus_config.changed | default(false) or
+      cert_files_updated.changed | default(false)
+    - not (prometheus_restarted | default(false))
+  notify: "Verify services started"
